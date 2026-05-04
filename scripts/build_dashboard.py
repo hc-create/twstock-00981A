@@ -174,6 +174,7 @@ def fig_returns_heatmap(prices: pd.DataFrame, top20: pd.DataFrame, window_days: 
         title=f"Top 20 個股每日漲跌熱圖(近 {window_days} 天)",
         height=600, margin=dict(l=20, r=20, t=50, b=40),
         yaxis=dict(autorange="reversed"),
+        xaxis=dict(type="category"),
     )
     return fig
 
@@ -251,6 +252,7 @@ def fig_position_heatmap(holdings: pd.DataFrame, prices: pd.DataFrame,
         title=f"Top 20 經理人加減碼熱圖(近 {n_days} 個交易日,千股)",
         height=600, margin=dict(l=20, r=20, t=50, b=40),
         yaxis=dict(autorange="reversed"),
+        xaxis=dict(type="category"),
     )
     return fig
 
@@ -289,6 +291,7 @@ def fig_inst_total_heatmap(chips_all: sqlite3.Connection,
         title=f"Top 20 三大法人合計買賣超熱圖(近 {n_days} 個交易日,張)",
         height=600, margin=dict(l=20, r=20, t=50, b=40),
         yaxis=dict(autorange="reversed"),
+        xaxis=dict(type="category"),
     )
     return fig
 
