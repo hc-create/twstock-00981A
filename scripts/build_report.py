@@ -124,6 +124,69 @@ def build(window_days: int = 30):
            )
     """, latest, start)
 
+    # ---- Top 20 × last 10 trading days matrix ----
+    # Use real trading days from prices.00981A; holdings has occasional
+    # weekend TranDates due to PCF publication quirks.
+    last10 = [r[0] for r in q(conn_p,
+        "SELECT trade_date FROM prices WHERE ticker = '00981A' "
+        "ORDER BY trade_date DESC LIMIT 10",
+    )]
+    last10.reverse()  # chronological
+
+    top20_codes = [r[0] for r in top20]
+    top20_names = {r[0]: r[1] for r in top20}
+    matrix_shares: list[tuple[str, list]] = []
+    matrix_ret: list[tuple[str, list]] = []
+    matrix_chip: list[tuple[str, list]] = []
+
+    placeholders = ",".join("?" * len(last10))
+    for code in top20_codes:
+        # Forward-fill holdings to align with trading days
+        full_history = q(conn_h,
+            "SELECT trade_date, shares FROM holdings "
+            "WHERE stock_code = ? ORDER BY trade_date",
+            code,
+        )
+
+        def shares_at(d_str, hist=full_history):
+            last = None
+            for td, s in hist:
+                if td <= d_str:
+                    last = s
+                else:
+                    break
+            return last
+
+        prev_d = (date.fromisoformat(last10[0]) - timedelta(days=1)).isoformat()
+        running = shares_at(prev_d)
+        deltas = []
+        for d in last10:
+            cur = shares_at(d)
+            if cur is None or running is None:
+                deltas.append(None)
+            else:
+                deltas.append((cur - running) / 1000)
+            running = cur if cur is not None else running
+        matrix_shares.append((code, deltas))
+
+        chg_map = dict(q(conn_p,
+            f'SELECT trade_date, "change" FROM prices '
+            f"WHERE ticker = ? AND trade_date IN ({placeholders})",
+            code, *last10,
+        ))
+        matrix_ret.append((code, [chg_map.get(d) for d in last10]))
+
+        chip_map = dict(q(conn_p,
+            f"SELECT trade_date, SUM(net) FROM chips "
+            f"WHERE stock_code = ? AND trade_date IN ({placeholders}) "
+            f"GROUP BY trade_date",
+            code, *last10,
+        ))
+        matrix_chip.append((code, [
+            chip_map[d] / 1000 if chip_map.get(d) is not None else None
+            for d in last10
+        ]))
+
     # ---- Daily price action for window (with NAV + premium/discount) ----
     # PCF API TranDate has occasional alignment quirks (weekend timestamps,
     # 1-day lag). Forward-fill: for any trading day without NAV, use the
@@ -308,8 +371,58 @@ def build(window_days: int = 30):
         out.append("（無）")
     out.append("")
 
+    # ---- Section 四: Top 20 × last 10 days matrix ----
+    short_dates = [d[5:] for d in last10]
+    header_dates = " | ".join(short_dates)
+
+    def _cell(v, fmt="+,.0f"):
+        if v is None:
+            return "—"
+        if v == 0:
+            return "0"
+        return format(v, fmt)
+
+    out.append(f"## 四、Top 20 × 近 10 個交易日矩陣({last10[0]} → {last10[-1]})")
+    out.append("")
+
+    out.append("### 4-1 持倉日變化(千股,經理人加減碼)")
+    out.append("")
+    out.append(f"| 代號 | 名稱 | {header_dates} | 累計 |")
+    out.append("|---|---|" + "--:|" * (len(last10) + 1))
+    for code, deltas in matrix_shares:
+        cells = " | ".join(_cell(v) for v in deltas)
+        total = sum(v for v in deltas if v is not None)
+        out.append(f"| {code} | {top20_names[code]} | {cells} | {total:+,.0f} |")
+    out.append("")
+
+    out.append("### 4-2 個股每日漲跌(%)")
+    out.append("")
+    out.append(f"| 代號 | 名稱 | {header_dates} | 累計% |")
+    out.append("|---|---|" + "--:|" * (len(last10) + 1))
+    for code, rets in matrix_ret:
+        cells = " | ".join(
+            f"{v:+.2f}" if v is not None else "—" for v in rets
+        )
+        prod = 1.0
+        for v in rets:
+            if v is not None:
+                prod *= (1 + v / 100)
+        cum = (prod - 1) * 100
+        out.append(f"| {code} | {top20_names[code]} | {cells} | {cum:+.1f} |")
+    out.append("")
+
+    out.append("### 4-3 三大法人合計買賣超(張)")
+    out.append("")
+    out.append(f"| 代號 | 名稱 | {header_dates} | 累計 |")
+    out.append("|---|---|" + "--:|" * (len(last10) + 1))
+    for code, nets in matrix_chip:
+        cells = " | ".join(_cell(v) for v in nets)
+        total = sum(v for v in nets if v is not None)
+        out.append(f"| {code} | {top20_names[code]} | {cells} | {total:+,.0f} |")
+    out.append("")
+
     # Daily action
-    out.append("## 四、觀察窗內每日大盤 vs 00981A(含折溢價)")
+    out.append("## 五、觀察窗內每日大盤 vs 00981A(含折溢價)")
     out.append("")
     out.append("| 日期 | TAIEX 收盤 | TAIEX 漲跌 | 00981A 收盤 | 00981A 漲跌 | 超額 | NAV/單位 | 折溢價% |")
     out.append("|---|--:|--:|--:|--:|--:|--:|--:|")
