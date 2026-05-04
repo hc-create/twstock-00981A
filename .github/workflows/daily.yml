@@ -1,0 +1,66 @@
+name: daily-scrape
+
+on:
+  schedule:
+    # 14:30 TPE (Mon-Fri) — after market close
+    - cron: "30 6 * * 1-5"
+    # 08:30 TPE (Mon-Fri) — pre market open
+    - cron: "30 0 * * 1-5"
+  workflow_dispatch:  # allow manual run from GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compute date window
+        id: window
+        run: |
+          end=$(TZ=Asia/Taipei date +%F)
+          start=$(TZ=Asia/Taipei date -d "$end -10 days" +%F 2>/dev/null \
+                || TZ=Asia/Taipei date -v-10d +%F)
+          echo "end=$end"   >> "$GITHUB_OUTPUT"
+          echo "start=$start" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch holdings (last 5 trading days, force-refresh)
+        working-directory: scripts
+        run: python fetch_holdings.py --days 5 --force
+
+      - name: Fetch prices (last 10 calendar days)
+        working-directory: scripts
+        run: python fetch_prices.py --start ${{ steps.window.outputs.start }} --end ${{ steps.window.outputs.end }}
+
+      - name: Fetch chips (last 10 calendar days)
+        working-directory: scripts
+        run: python fetch_chips.py --start ${{ steps.window.outputs.start }} --end ${{ steps.window.outputs.end }}
+
+      - name: Build markdown report
+        working-directory: scripts
+        run: python build_report.py --window 30
+
+      - name: Build dashboard
+        working-directory: scripts
+        run: python build_dashboard.py --window 30
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/ reports/ logs/ || true
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "auto: daily scrape $(TZ=Asia/Taipei date '+%F %H:%M %Z')"
+            git push
+          fi
