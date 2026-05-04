@@ -304,14 +304,21 @@ def build(window_days: int):
         (f"八、Top 20 — 投信買賣超累計", fig_chips_bar(chips, top20, window_days)),
     ]
 
+    subtitle = (f"資料截止 {latest} · 觀察窗 {window_days} 天 · "
+                f"產生時間 {datetime.now().isoformat(timespec='seconds')}")
+
+    # archive copy with date in filename
     out = ROOT / "reports" / f"dashboard_{latest}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
-    render(
-        figures, out,
-        subtitle=f"資料截止 {latest} · 觀察窗 {window_days} 天 · "
-                 f"產生時間 {datetime.now().isoformat(timespec='seconds')}",
-    )
+    render(figures, out, subtitle=subtitle)
     print(f"Wrote {out}")
+
+    # stable URL for GitHub Pages
+    pages_out = ROOT / "docs" / "index.html"
+    pages_out.parent.mkdir(parents=True, exist_ok=True)
+    render(figures, pages_out, subtitle=subtitle)
+    print(f"Wrote {pages_out}")
+
     return out
 
 
