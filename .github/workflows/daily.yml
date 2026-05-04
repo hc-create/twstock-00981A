@@ -8,6 +8,9 @@ on:
     - cron: "30 0 * * 1-5"
   workflow_dispatch:  # allow manual run from GitHub UI
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
