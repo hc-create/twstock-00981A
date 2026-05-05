@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -56,11 +58,16 @@ jobs:
         working-directory: scripts
         run: python build_dashboard.py --window 30
 
+      - name: Generate Claude commentary
+        if: env.ANTHROPIC_API_KEY != ''
+        working-directory: scripts
+        run: python commentary.py
+
       - name: Commit and push if changed
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/ reports/ logs/ || true
+          git add data/ reports/ docs/ logs/ || true
           if git diff --cached --quiet; then
             echo "No changes."
           else
