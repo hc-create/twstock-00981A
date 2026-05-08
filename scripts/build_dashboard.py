@@ -358,12 +358,22 @@ def render(figures: list[tuple[str, go.Figure]], out_path: Path,
            margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }}
   .card h2 {{ margin: 0 0 8px 0; font-size: 15px; color: #555;
               text-transform: uppercase; letter-spacing: .5px; }}
+  .nav-row {{ display: flex; gap: 8px; margin-bottom: 16px; }}
+  .nav-btn {{ display: inline-block; padding: 8px 14px;
+              background: #111; color: white; border-radius: 6px;
+              text-decoration: none; font-size: 13px; font-weight: 500; }}
+  .nav-btn.alt {{ background: white; color: #111; border: 1px solid #ddd; }}
+  .nav-btn:hover {{ opacity: .85; }}
   footer {{ color: #999; font-size: 12px; text-align: center; margin-top: 40px; }}
 </style>
 </head>
 <body>
 <h1>00981A 主動統一台股增長 — 互動報告</h1>
 <div class="sub">{subtitle}</div>
+<div class="nav-row">
+  <a class="nav-btn" href="index.html">總覽(本頁)</a>
+  <a class="nav-btn alt" href="stock.html">個股深度分析 →</a>
+</div>
 """)
     for i, (caption, fig) in enumerate(figures):
         include_js = "cdn" if i == 0 else False

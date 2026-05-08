@@ -58,6 +58,10 @@ jobs:
         working-directory: scripts
         run: python build_dashboard.py --window 30
 
+      - name: Build per-stock dashboard
+        working-directory: scripts
+        run: python build_stock_dashboard.py
+
       - name: Generate Claude commentary
         if: env.ANTHROPIC_API_KEY != ''
         working-directory: scripts
