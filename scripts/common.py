@@ -1,7 +1,9 @@
 import re
 import sqlite3
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+
+TPE_TZ = timezone(timedelta(hours=8))
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
@@ -25,7 +27,9 @@ def parse_js_date(js_date: str) -> date | None:
     m = re.match(r"/Date\((\d+)\)/", js_date)
     if not m:
         return None
-    return datetime.utcfromtimestamp(int(m.group(1)) / 1000).date()
+    # API encodes TranDate as TPE midnight; use TPE tz so .date() returns the
+    # actual Taiwan trading day rather than the UTC date (off by 1 ahead of 8am).
+    return datetime.fromtimestamp(int(m.group(1)) / 1000, tz=TPE_TZ).date()
 
 
 def trading_days(start: date, end: date) -> list[date]:
